@@ -15,8 +15,8 @@ const generateEmailSchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
-    const { clientName, context, tone, length } = generateEmailSchema.parse(body)
+    const requestBody = await req.json()
+    const { clientName, context, tone, length } = generateEmailSchema.parse(requestBody)
 
     const prompt = `Write a ${tone} email to ${clientName} about the following: ${context}
     The email should be ${length} in length.
