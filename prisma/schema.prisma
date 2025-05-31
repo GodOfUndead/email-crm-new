@@ -13,6 +13,7 @@ datasource db {
 enum EmailStatus {
   DRAFT
   SENT
+  REPLIED
   FAILED
 }
 
@@ -21,6 +22,12 @@ enum FollowUpStatus {
   SENT
   CANCELLED
   FAILED
+}
+
+enum DraftStatus {
+  PENDING
+  SENT
+  CANCELLED
 }
 
 enum ClientStatus {
@@ -33,36 +40,36 @@ enum ClientStatus {
 }
 
 model Email {
-  id            String    @id @default(cuid())
-  subject       String
-  content       String
-  status        EmailStatus @default(DRAFT)
-  clientId      String
-  client        Client    @relation(fields: [clientId], references: [id])
-  sentAt        DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  followUps     FollowUp[]
-  drafts        Draft[]
+  id        String      @id @default(cuid())
+  subject   String
+  content   String
+  status    EmailStatus @default(DRAFT)
+  clientId  String
+  client    Client      @relation(fields: [clientId], references: [id])
+  sentAt    DateTime?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  followUps FollowUp[]
+  drafts    Draft[]
 }
 
 model Client {
-  id                String    @id @default(cuid())
+  id                String       @id @default(cuid())
   companyName       String
   leadName          String
-  email             String    @unique
+  email             String       @unique
   lastContactDate   DateTime
   nextFollowUp      DateTime?
   proposalLink      String?
   proposedSolution  String?
-  status            String
+  status            ClientStatus @default(NEW)
   pipedriveId       String?
   pipedriveOrgId    String?
   pipedrivePersonId String?
   pipedriveDealId   String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
   emails            Email[]
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
   followUps         FollowUp[]
 }
 
@@ -71,30 +78,30 @@ model Draft {
   emailId   String
   email     Email    @relation(fields: [emailId], references: [id])
   content   String
-  status    String
+  status    DraftStatus @default(PENDING)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model Analytics {
-  id            String   @id @default(cuid())
-  type          String   // emails_sent, replies_received, follow_ups_needed
-  value         Int
-  date          DateTime
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id        String   @id @default(cuid())
+  type      String // emails_sent, replies_received, follow_ups_needed
+  value     Int
+  date      DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model FollowUp {
-  id            String    @id @default(cuid())
-  emailId       String
-  email         Email     @relation(fields: [emailId], references: [id])
-  clientId      String
-  client        Client    @relation(fields: [clientId], references: [id])
-  status        FollowUpStatus @default(PENDING)
-  scheduledFor  DateTime
-  content       String?
-  sentAt        DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-} 
+  id          String         @id @default(cuid())
+  emailId     String
+  email       Email          @relation(fields: [emailId], references: [id])
+  clientId    String
+  client      Client         @relation(fields: [clientId], references: [id])
+  status      FollowUpStatus @default(PENDING)
+  scheduledAt DateTime
+  content     String?
+  sentAt      DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}

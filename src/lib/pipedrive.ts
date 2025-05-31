@@ -330,7 +330,7 @@ export async function updatePipedriveDeal(
     console.error("Error updating Pipedrive deal:", error)
     throw new Error("Failed to update Pipedrive deal")
   }
-}
+} 
 
 // You might add other Pipedrive related functions here, e.g., to update deals, find deals, etc.
 // export async function updateDeal(...) { ... }
