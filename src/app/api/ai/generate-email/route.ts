@@ -46,11 +46,11 @@ export async function POST(req: Request) {
 
     // Extract subject and body
     const [subject, ...bodyParts] = emailContent.split("\n\n")
-    const body = bodyParts.join("\n\n")
+    const emailBody = bodyParts.join("\n\n")
 
     return NextResponse.json({
       subject: subject.replace("Subject: ", ""),
-      body,
+      body: emailBody,
     })
   } catch (error) {
     console.error("Error generating email:", error)
