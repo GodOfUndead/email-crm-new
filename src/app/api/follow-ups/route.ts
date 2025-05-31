@@ -1,116 +1,88 @@
 import { NextResponse } from "next/server"
-import { PrismaClient } from "@prisma/client"
-import { generateFollowUpContent } from "@/lib/ai"
+import { prisma } from "@/lib/prisma"
 import { sendEmail } from "@/lib/gmail"
+import { addToQueue } from "@/lib/redis"
+import { z } from "zod"
 
-const prisma = new PrismaClient()
+const createFollowUpSchema = z.object({
+  emailId: z.string(),
+  clientId: z.string(),
+  content: z.string().nullable().default(null),
+  scheduledFor: z.string().transform((str) => new Date(str)),
+})
 
-// Get all follow-up drafts
-export async function GET() {
+// This GET route could be used to fetch pending follow-up drafts for review
+export async function GET(req: Request) {
   try {
-    const drafts = await prisma.followUp.findMany({
-      where: { status: "pending" },
+    const { searchParams } = new URL(req.url)
+    const status = searchParams.get("status")
+
+    const followUps = await prisma.followUp.findMany({
+      where: status ? { status: status as any } : undefined,
       include: {
         email: true,
         client: true,
       },
-      orderBy: { scheduledAt: "asc" },
+      orderBy: {
+        createdAt: "desc",
+      },
     })
-    return NextResponse.json(drafts)
+
+    return NextResponse.json(followUps)
   } catch (error) {
+    console.error("Error fetching follow-ups:", error)
     return NextResponse.json(
-      { error: "Failed to fetch follow-up drafts" },
+      { error: "Failed to fetch follow-ups" },
       { status: 500 }
     )
   }
 }
 
-// Create a new follow-up draft
-export async function POST(request: Request) {
+// This POST route could be used to manually trigger follow-up generation or processing
+export async function POST(req: Request) {
   try {
-    const { emailId } = await request.json()
+    const body = await req.json()
+    const { emailId, clientId, content, scheduledFor } =
+      createFollowUpSchema.parse(body)
 
-    // Get the original email
-    const email = await prisma.email.findUnique({
-      where: { id: emailId },
-      include: { client: true },
-    })
-
-    if (!email) {
-      return NextResponse.json(
-        { error: "Email not found" },
-        { status: 404 }
-      )
-    }
-
-    // Generate follow-up content using AI
-    const followUpContent = await generateFollowUpContent({
-      subject: email.subject,
-      content: email.content,
-      recipient: email.recipient,
-    })
-
-    // Create follow-up draft
     const followUp = await prisma.followUp.create({
       data: {
-        emailId: email.id,
-        clientId: email.client?.id || "",
-        content: followUpContent,
-        status: "pending",
-        scheduledAt: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000), // 6 days from now
+        emailId,
+        clientId,
+        content: content!,
+        status: "PENDING",
+        scheduledFor,
       },
+      include: {
+        email: true,
+        client: true,
+      },
+    })
+
+    // Add to queue for processing
+    await addToQueue({
+      type: "follow-up",
+      data: { followUpId: followUp.id },
     })
 
     return NextResponse.json(followUp)
   } catch (error) {
-    console.error("Failed to create follow-up draft:", error)
+    console.error("Error creating follow-up:", error)
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Invalid request data" },
+        { status: 400 }
+      )
+    }
     return NextResponse.json(
-      { error: "Failed to create follow-up draft" },
+      { error: "Failed to create follow-up" },
       { status: 500 }
     )
   }
 }
 
-// Send a follow-up draft
-export async function PUT(request: Request) {
-  try {
-    const { id } = await request.json()
+// This PUT route could be used to update a follow-up status or content
+// export async function PUT(request: Request) { ... }
 
-    // Get the follow-up draft
-    const followUp = await prisma.followUp.findUnique({
-      where: { id },
-      include: {
-        email: true,
-        client: true,
-      },
-    })
-
-    if (!followUp) {
-      return NextResponse.json(
-        { error: "Follow-up draft not found" },
-        { status: 404 }
-      )
-    }
-
-    // Send the follow-up email
-    await sendEmail(
-      followUp.email.recipient,
-      `Re: ${followUp.email.subject}`,
-      followUp.content
-    )
-
-    // Update follow-up status
-    const updatedFollowUp = await prisma.followUp.update({
-      where: { id },
-      data: { status: "sent" },
-    })
-
-    return NextResponse.json(updatedFollowUp)
-  } catch (error) {
-    console.error("Failed to send follow-up:", error)
-    return NextResponse.json(
-      { error: "Failed to send follow-up" },
-      { status: 500 }
-    )
-  }
-} 
+// This DELETE route could be used to delete a follow-up draft
+// export async function DELETE(request: Request) { ... } 

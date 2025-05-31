@@ -1,141 +1,131 @@
+"use client"
+
 import { useState } from "react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 interface Draft {
   id: string;
-  recipient: string;
   subject: string;
   content: string;
-  status: string;
-  threadId?: string;
-  sentAt: string;
-  type: "email" | "follow-up";
-  scheduledAt?: string;
+  clientId: string;
+  clientName: string;
+  createdAt: string;
 }
 
 interface DraftReviewProps {
-  drafts: Draft[];
-  onSend: (draftId: string) => Promise<void>;
-  onDelete: (draftId: string) => Promise<void>;
-  onEdit: (draftId: string, content: string) => Promise<void>;
+  draft: Draft;
+  onSend: (id: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  onEdit: (id: string, content: string) => Promise<void>;
+  onClose: () => void;
 }
 
-export function DraftReview({ drafts, onSend, onDelete, onEdit }: DraftReviewProps) {
-  const [selectedDraft, setSelectedDraft] = useState<Draft | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedContent, setEditedContent] = useState("");
+export function DraftReview({
+  draft,
+  onSend,
+  onDelete,
+  onEdit,
+  onClose,
+}: DraftReviewProps) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [editedContent, setEditedContent] = useState(draft.content);
+
+  const handleSend = async () => {
+    setIsLoading(true);
+    try {
+      await onSend(draft.id);
+      onClose();
+    } catch (error) {
+      console.error("Error sending draft:", error);
+      toast.error("Failed to send email");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setIsLoading(true);
+    try {
+      await onDelete(draft.id);
+      onClose();
+    } catch (error) {
+      console.error("Error deleting draft:", error);
+      toast.error("Failed to delete draft");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleEdit = async () => {
-    if (selectedDraft && editedContent) {
-      await onEdit(selectedDraft.id, editedContent);
-      setIsEditing(false);
+    setIsLoading(true);
+    try {
+      await onEdit(draft.id, editedContent);
+      toast.success("Draft updated successfully");
+    } catch (error) {
+      console.error("Error updating draft:", error);
+      toast.error("Failed to update draft");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-2xl font-bold">Draft Review</h2>
-      <div className="grid gap-4">
-        {drafts.map((draft) => (
-          <Card key={draft.id} className="p-4">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Badge variant={draft.type === "email" ? "default" : "secondary"}>
-                    {draft.type === "email" ? "Email" : "Follow-up"}
-                  </Badge>
-                  <Badge variant="outline">{draft.status}</Badge>
-                </div>
-                <h3 className="font-semibold">{draft.subject}</h3>
-                <p className="text-sm text-gray-500">To: {draft.recipient}</p>
-                {draft.scheduledAt && (
-                  <p className="text-sm text-gray-500">
-                    Scheduled: {new Date(draft.scheduledAt).toLocaleString()}
-                  </p>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" onClick={() => setSelectedDraft(draft)}>
-                      Review
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-3xl">
-                    <DialogHeader>
-                      <DialogTitle>Review Draft</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label>Subject</Label>
-                        <p className="font-medium">{draft.subject}</p>
-                      </div>
-                      <div>
-                        <Label>Recipient</Label>
-                        <p>{draft.recipient}</p>
-                      </div>
-                      <div>
-                        <Label>Content</Label>
-                        {isEditing ? (
-                          <textarea
-                            className="w-full h-48 p-2 border rounded-md"
-                            value={editedContent}
-                            onChange={(e) => setEditedContent(e.target.value)}
-                          />
-                        ) : (
-                          <div className="p-4 bg-gray-50 rounded-md whitespace-pre-wrap">
-                            {draft.content}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        {isEditing ? (
-                          <>
-                            <Button
-                              variant="outline"
-                              onClick={() => {
-                                setIsEditing(false);
-                                setEditedContent(draft.content);
-                              }}
-                            >
-                              Cancel
-                            </Button>
-                            <Button onClick={handleEdit}>Save Changes</Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button
-                              variant="outline"
-                              onClick={() => {
-                                setIsEditing(true);
-                                setEditedContent(draft.content);
-                              }}
-                            >
-                              Edit
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              onClick={() => onDelete(draft.id)}
-                            >
-                              Delete
-                            </Button>
-                            <Button onClick={() => onSend(draft.id)}>Send</Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
-    </div>
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>Review Draft</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div>
+            <h3 className="font-medium">Subject</h3>
+            <p className="text-sm text-muted-foreground">{draft.subject}</p>
+          </div>
+
+          <div>
+            <h3 className="font-medium">To</h3>
+            <p className="text-sm text-muted-foreground">{draft.clientName}</p>
+          </div>
+
+          <div>
+            <h3 className="font-medium">Content</h3>
+            <Textarea
+              value={editedContent}
+              onChange={(e) => setEditedContent(e.target.value)}
+              className="min-h-[200px]"
+            />
+          </div>
+        </div>
+
+        <DialogFooter className="space-x-2">
+          <Button
+            variant="outline"
+            onClick={handleEdit}
+            disabled={isLoading || editedContent === draft.content}
+          >
+            Save Changes
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleDelete}
+            disabled={isLoading}
+          >
+            Delete
+          </Button>
+          <Button onClick={handleSend} disabled={isLoading}>
+            {isLoading ? "Sending..." : "Send"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 } 

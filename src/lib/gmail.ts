@@ -2,13 +2,13 @@ import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 
 const oauth2Client = new OAuth2Client(
-  process.env.GMAIL_CLIENT_ID,
-  process.env.GMAIL_CLIENT_SECRET,
-  'https://developers.google.com/oauthplayground'
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  process.env.GOOGLE_REDIRECT_URI
 );
 
 oauth2Client.setCredentials({
-  refresh_token: process.env.GMAIL_REFRESH_TOKEN,
+  refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
 });
 
 const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
@@ -16,31 +16,103 @@ const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 export async function sendEmail(to: string, subject: string, content: string) {
   try {
     const message = [
-      'Content-Type: text/html; charset=utf-8',
-      'MIME-Version: 1.0',
-      `To: ${to}`,
-      'From: me',
-      `Subject: ${subject}`,
-      '',
+      'Content-Type: text/html; charset="UTF-8"\n',
+      "MIME-Version: 1.0\n",
+      `To: ${to}\n`,
+      `Subject: ${subject}\n\n`,
       content,
-    ].join('\n');
+    ].join("");
 
     const encodedMessage = Buffer.from(message)
-      .toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
 
-    const res = await gmail.users.messages.send({
+    const response = await gmail.users.messages.send({
       userId: 'me',
       requestBody: {
         raw: encodedMessage,
       },
     });
 
-    return res.data;
+    return response.data;
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error("Error sending email:", error);
+    throw error;
+  }
+}
+
+export async function getEmails(maxResults = 10) {
+  try {
+    const response = await gmail.users.messages.list({
+      userId: 'me',
+      maxResults,
+    });
+
+    const messages = response.data.messages || [];
+    const emails = await Promise.all(
+      messages.map(async (message) => {
+        const email = await gmail.users.messages.get({
+          userId: 'me',
+          id: message.id!,
+        });
+
+        const headers = email.data.payload?.headers;
+        const subject = headers?.find((h) => h.name === "Subject")?.value;
+        const from = headers?.find((h) => h.name === "From")?.value;
+        const date = headers?.find((h) => h.name === "Date")?.value;
+
+        return {
+          id: message.id,
+          subject,
+          from,
+          date,
+          snippet: email.data.snippet,
+        };
+      })
+    );
+
+    return emails;
+  } catch (error) {
+    console.error("Error fetching emails:", error);
+    throw error;
+  }
+}
+
+export async function getThread(threadId: string) {
+  try {
+    const response = await gmail.users.threads.get({
+      userId: 'me',
+      id: threadId,
+    });
+
+    const messages = response.data.messages || [];
+    const thread = await Promise.all(
+      messages.map(async (message) => {
+        const email = await gmail.users.messages.get({
+          userId: 'me',
+          id: message.id!,
+        });
+
+        const headers = email.data.payload?.headers;
+        const subject = headers?.find((h) => h.name === "Subject")?.value;
+        const from = headers?.find((h) => h.name === "From")?.value;
+        const date = headers?.find((h) => h.name === "Date")?.value;
+
+        return {
+          id: message.id,
+          subject,
+          from,
+          date,
+          snippet: email.data.snippet,
+        };
+      })
+    );
+
+    return thread;
+  } catch (error) {
+    console.error("Error fetching thread:", error);
     throw error;
   }
 }

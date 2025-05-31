@@ -8,20 +8,19 @@ const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "Email CRM",
-  description: "Email CRM Management System",
+  description: "A comprehensive email CRM management system.",
 }
 
 export default function RootLayout({
   children,
-}: {
-  children: React.ReactNode
-}) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
       <body className={inter.className}>
         <Providers>
           {children}
-          <Toaster />
+          {/* The Toaster component is rendered within Providers or directly in the layout */}
+          {/* <Toaster /> */}
         </Providers>
       </body>
     </html>

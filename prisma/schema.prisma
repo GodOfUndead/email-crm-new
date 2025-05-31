@@ -10,34 +10,60 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum EmailStatus {
+  DRAFT
+  SENT
+  FAILED
+}
+
+enum FollowUpStatus {
+  PENDING
+  SENT
+  CANCELLED
+  FAILED
+}
+
+enum ClientStatus {
+  NEW
+  CONTACTED
+  PROPOSAL_SENT
+  NEGOTIATING
+  CLOSED
+  LOST
+}
+
 model Email {
-  id          String     @id @default(cuid())
-  recipient   String
-  subject     String
-  content     String
-  sentAt      DateTime   @default(now())
-  status      String     @default("sent")
-  followUps   FollowUp[]
-  drafts      Draft[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id            String    @id @default(cuid())
+  subject       String
+  content       String
+  status        EmailStatus @default(DRAFT)
+  clientId      String
+  client        Client    @relation(fields: [clientId], references: [id])
+  sentAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  followUps     FollowUp[]
+  drafts        Draft[]
 }
 
 model Client {
-  id                String     @id @default(cuid())
+  id                String    @id @default(cuid())
   companyName       String
   leadName          String
+  email             String    @unique
   lastContactDate   DateTime
   nextFollowUp      DateTime?
   proposalLink      String?
   proposedSolution  String?
   status            String
+  pipedriveId       String?
   pipedriveOrgId    String?
   pipedrivePersonId String?
   pipedriveDealId   String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  emails            Email[]
   followUps         FollowUp[]
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
 }
 
 model Draft {
@@ -45,8 +71,8 @@ model Draft {
   emailId   String
   email     Email    @relation(fields: [emailId], references: [id])
   content   String
+  status    String
   createdAt DateTime @default(now())
-  status    String   // pending, sent, deleted
   updatedAt DateTime @updatedAt
 }
 
@@ -60,35 +86,15 @@ model Analytics {
 }
 
 model FollowUp {
-  id          String   @id @default(cuid())
-  emailId     String
-  email       Email    @relation(fields: [emailId], references: [id])
-  clientId    String
-  client      Client   @relation(fields: [clientId], references: [id])
-  content     String
-  status      String   @default("pending")
-  scheduledAt DateTime
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-enum EmailStatus {
-  SENT
-  REPLIED
-  FOLLOW_UP
-}
-
-enum ClientStatus {
-  NEW
-  CONTACTED
-  PROPOSAL_SENT
-  NEGOTIATING
-  CLOSED
-  LOST
-}
-
-enum FollowUpStatus {
-  PENDING
-  SENT
-  CANCELLED
+  id            String    @id @default(cuid())
+  emailId       String
+  email         Email     @relation(fields: [emailId], references: [id])
+  clientId      String
+  client        Client    @relation(fields: [clientId], references: [id])
+  status        FollowUpStatus @default(PENDING)
+  scheduledFor  DateTime
+  content       String?
+  sentAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 } 

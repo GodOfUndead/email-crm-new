@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { format } from "date-fns"
-import { Badge } from "@/components/ui/badge"
 import {
   Table,
   TableBody,
@@ -12,134 +11,121 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 
-type Draft = {
+interface Draft {
   id: string
-  emailId: string
+  subject: string
   content: string
+  clientId: string
+  clientName: string
   createdAt: string
-  status: string
-  originalEmail: {
-    subject: string
-    recipient: string
-  }
 }
 
 export function DraftList() {
   const [drafts, setDrafts] = useState<Draft[]>([])
-  const [loading, setLoading] = useState(true)
-  const { toast } = useToast()
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    const fetchDrafts = async () => {
+      try {
+        const response = await fetch("/api/emails?status=DRAFT")
+        if (!response.ok) throw new Error("Failed to fetch drafts")
+        const data = await response.json()
+        setDrafts(data)
+      } catch (error) {
+        console.error("Error fetching drafts:", error)
+        toast.error("Failed to load drafts")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
     fetchDrafts()
   }, [])
 
-  const fetchDrafts = async () => {
-    try {
-      const response = await fetch("/api/drafts")
-      const data = await response.json()
-      setDrafts(data)
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch drafts",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const handleSend = async (draftId: string) => {
     try {
-      const response = await fetch(`/api/drafts/${draftId}/send`, {
+      const response = await fetch(`/api/emails/${draftId}/send`, {
         method: "POST",
       })
 
-      if (!response.ok) throw new Error("Failed to send draft")
+      if (!response.ok) throw new Error("Failed to send email")
 
-      toast({
-        title: "Success",
-        description: "Draft sent successfully",
-      })
-      fetchDrafts()
+      toast.success("Email sent successfully")
+      setDrafts((prev) => prev.filter((draft) => draft.id !== draftId))
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to send draft",
-        variant: "destructive",
-      })
+      console.error("Error sending email:", error)
+      toast.error("Failed to send email")
     }
   }
 
   const handleDelete = async (draftId: string) => {
     try {
-      const response = await fetch(`/api/drafts/${draftId}`, {
+      const response = await fetch(`/api/emails/${draftId}`, {
         method: "DELETE",
       })
 
       if (!response.ok) throw new Error("Failed to delete draft")
 
-      toast({
-        title: "Success",
-        description: "Draft deleted successfully",
-      })
-      fetchDrafts()
+      toast.success("Draft deleted successfully")
+      setDrafts((prev) => prev.filter((draft) => draft.id !== draftId))
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete draft",
-        variant: "destructive",
-      })
+      console.error("Error deleting draft:", error)
+      toast.error("Failed to delete draft")
     }
   }
 
-  if (loading) {
-    return <div>Loading...</div>
+  if (isLoading) {
+    return <div>Loading drafts...</div>
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Original Subject</TableHead>
-          <TableHead>Recipient</TableHead>
-          <TableHead>Created At</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {drafts.map((draft) => (
-          <TableRow key={draft.id}>
-            <TableCell>{draft.originalEmail.subject}</TableCell>
-            <TableCell>{draft.originalEmail.recipient}</TableCell>
-            <TableCell>
-              {format(new Date(draft.createdAt), "MMM d, yyyy HH:mm")}
-            </TableCell>
-            <TableCell>
-              <Badge variant="outline">{draft.status}</Badge>
-            </TableCell>
-            <TableCell className="space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleSend(draft.id)}
-              >
-                Send
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => handleDelete(draft.id)}
-              >
-                Delete
-              </Button>
-            </TableCell>
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Subject</TableHead>
+            <TableHead>Client</TableHead>
+            <TableHead>Created At</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {drafts.map((draft) => (
+            <TableRow key={draft.id}>
+              <TableCell className="font-medium">{draft.subject}</TableCell>
+              <TableCell>{draft.clientName}</TableCell>
+              <TableCell>
+                {format(new Date(draft.createdAt), "MMM d, yyyy HH:mm")}
+              </TableCell>
+              <TableCell className="text-right space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleSend(draft.id)}
+                >
+                  Send
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => handleDelete(draft.id)}
+                >
+                  Delete
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+          {drafts.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={4} className="text-center">
+                No drafts found
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
   )
 } 

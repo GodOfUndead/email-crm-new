@@ -40,90 +40,117 @@ export async function generateFollowUpContent(originalEmail: {
   }
 }
 
-export async function analyzeReply(originalEmail: {
-  subject: string;
-  content: string;
-}, replyContent: string) {
+export async function analyzeReply(content: string) {
   try {
-    const prompt = `Analyze this email reply and determine:
-    1. Is this a positive response, negative response, or neutral?
-    2. What are the key points or questions in the reply?
-    3. What action items or next steps are mentioned?
-    4. Is a further response needed?
-
-    Original Email:
-    Subject: ${originalEmail.subject}
-    Content: ${originalEmail.content}
-
-    Reply:
-    ${replyContent}
-
-    Provide your analysis in JSON format with these fields:
-    {
-      "sentiment": "positive|negative|neutral",
-      "keyPoints": ["point1", "point2", ...],
-      "actionItems": ["item1", "item2", ...],
-      "needsResponse": true|false,
-      "responsePriority": "high|medium|low"
-    }`;
-
     const completion = await openai.chat.completions.create({
-      messages: [{ role: "user", content: prompt }],
-      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content: `You are an email analysis expert. Analyze the following email reply and determine:
+1. The sentiment (positive, negative, neutral)
+2. Key points or requests made
+3. Whether a follow-up is needed
+4. Suggested next steps`,
+        },
+        {
+          role: "user",
+          content,
+        },
+      ],
+      model: "gpt-4-turbo-preview",
       temperature: 0.3,
-      response_format: { type: "json_object" },
     });
 
-    const content = completion.choices[0].message.content;
-    if (!content) {
-      throw new Error("No content generated from OpenAI");
+    const analysis = completion.choices[0]?.message?.content;
+    if (!analysis) {
+      throw new Error("Failed to analyze email");
     }
-    return JSON.parse(content);
+
+    return analysis;
   } catch (error) {
-    console.error('Error analyzing reply:', error);
+    console.error("Error analyzing email:", error);
     throw error;
   }
 }
 
-export async function generateChainReply(originalEmail: {
-  subject: string;
-  content: string;
-}, replyContent: string, analysis: any) {
+export async function generateChainReply(
+  originalEmail: string,
+  reply: string,
+  context: string
+) {
   try {
-    const prompt = `Generate a response to this email reply. Consider the following analysis:
-    
-    Sentiment: ${analysis.sentiment}
-    Key Points: ${analysis.keyPoints.join(', ')}
-    Action Items: ${analysis.actionItems.join(', ')}
-    Priority: ${analysis.responsePriority}
-
-    Original Email:
-    Subject: ${originalEmail.subject}
-    Content: ${originalEmail.content}
-
-    Reply Received:
-    ${replyContent}
-
-    The response should:
-    1. Address all key points and questions
-    2. Provide clear next steps for action items
-    3. Be professional and maintain the conversation flow
-    4. Match the tone of the previous emails
-    5. Be concise and actionable`;
-
     const completion = await openai.chat.completions.create({
-      messages: [{ role: "user", content: prompt }],
-      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content: `You are an email writing expert. Generate a follow-up email based on the following:
+1. The original email
+2. The reply received
+3. Additional context provided
+
+The follow-up should:
+- Be professional and courteous
+- Address any unanswered questions
+- Provide any missing information
+- Maintain a natural conversation flow`,
+        },
+        {
+          role: "user",
+          content: `Original Email:
+${originalEmail}
+
+Reply Received:
+${reply}
+
+Additional Context:
+${context}`,
+        },
+      ],
+      model: "gpt-4-turbo-preview",
       temperature: 0.7,
     });
 
-    const content = completion.choices[0].message.content;
-    if (!content) {
-      throw new Error("No content generated from OpenAI");
+    const followUp = completion.choices[0]?.message?.content;
+    if (!followUp) {
+      throw new Error("Failed to generate follow-up");
     }
-    return content;
+
+    return followUp;
   } catch (error) {
-    console.error('Error generating chain reply:', error);
+    console.error("Error generating follow-up:", error);
+    throw error;
+  }
+}
+
+export async function generateEmailSummary(emails: string[]) {
+  try {
+    const completion = await openai.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content: `You are an email summarization expert. Create a concise summary of the following email thread:
+1. Main topic or purpose
+2. Key points discussed
+3. Action items or next steps
+4. Overall status or conclusion`,
+        },
+        {
+          role: "user",
+          content: emails.join("\n\n"),
+        },
+      ],
+      model: "gpt-4-turbo-preview",
+      temperature: 0.3,
+    });
+
+    const summary = completion.choices[0]?.message?.content;
+    if (!summary) {
+      throw new Error("Failed to generate summary");
+    }
+
+    return summary;
+  } catch (error) {
+    console.error("Error generating email summary:", error);
     throw error;
   }
 } 

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { format } from "date-fns"
-import { Badge } from "@/components/ui/badge"
 import {
   Table,
   TableBody,
@@ -11,93 +10,92 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Button } from "@/components/ui/button"
-import { useToast } from "@/hooks/use-toast"
+import { Badge } from "@/components/ui/badge"
+import { toast } from "sonner"
 
-type Email = {
+interface Email {
   id: string
   subject: string
-  recipient: string
-  status: string
-  sentAt: string
-  repliedAt?: string
+  content: string
+  status: "DRAFT" | "SENT" | "FAILED"
+  clientId: string
+  sentAt: string | null
+  createdAt: string
 }
 
 export function EmailList() {
   const [emails, setEmails] = useState<Email[]>([])
-  const [loading, setLoading] = useState(true)
-  const { toast } = useToast()
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    const fetchEmails = async () => {
+      try {
+        const response = await fetch("/api/emails")
+        if (!response.ok) throw new Error("Failed to fetch emails")
+        const data = await response.json()
+        setEmails(data)
+      } catch (error) {
+        console.error("Error fetching emails:", error)
+        toast.error("Failed to load emails")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
     fetchEmails()
   }, [])
 
-  const fetchEmails = async () => {
-    try {
-      const response = await fetch("/api/emails")
-      const data = await response.json()
-      setEmails(data)
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch emails",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (loading) {
-    return <div>Loading...</div>
+  if (isLoading) {
+    return <div>Loading emails...</div>
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Subject</TableHead>
-          <TableHead>Recipient</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Sent At</TableHead>
-          <TableHead>Replied At</TableHead>
-          <TableHead>Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {emails.map((email) => (
-          <TableRow key={email.id}>
-            <TableCell>{email.subject}</TableCell>
-            <TableCell>{email.recipient}</TableCell>
-            <TableCell>
-              <Badge
-                variant={
-                  email.status === "replied"
-                    ? "success"
-                    : email.status === "follow-up"
-                    ? "warning"
-                    : "default"
-                }
-              >
-                {email.status}
-              </Badge>
-            </TableCell>
-            <TableCell>
-              {format(new Date(email.sentAt), "MMM d, yyyy HH:mm")}
-            </TableCell>
-            <TableCell>
-              {email.repliedAt
-                ? format(new Date(email.repliedAt), "MMM d, yyyy HH:mm")
-                : "-"}
-            </TableCell>
-            <TableCell>
-              <Button variant="outline" size="sm">
-                View
-              </Button>
-            </TableCell>
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Subject</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Sent At</TableHead>
+            <TableHead>Created At</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {emails.map((email) => (
+            <TableRow key={email.id}>
+              <TableCell className="font-medium">{email.subject}</TableCell>
+              <TableCell>
+                <Badge
+                  variant={
+                    email.status === "SENT"
+                      ? "default"
+                      : email.status === "DRAFT"
+                      ? "secondary"
+                      : "destructive"
+                  }
+                >
+                  {email.status.toLowerCase()}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                {email.sentAt
+                  ? format(new Date(email.sentAt), "MMM d, yyyy HH:mm")
+                  : "-"}
+              </TableCell>
+              <TableCell>
+                {format(new Date(email.createdAt), "MMM d, yyyy HH:mm")}
+              </TableCell>
+            </TableRow>
+          ))}
+          {emails.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={4} className="text-center">
+                No emails found
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
   )
 } 
