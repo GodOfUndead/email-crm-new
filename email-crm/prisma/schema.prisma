@@ -1,0 +1,94 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Email {
+  id          String     @id @default(cuid())
+  recipient   String
+  subject     String
+  content     String
+  sentAt      DateTime   @default(now())
+  status      String     @default("sent")
+  followUps   FollowUp[]
+  drafts      Draft[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Client {
+  id                String     @id @default(cuid())
+  companyName       String
+  leadName          String
+  lastContactDate   DateTime
+  nextFollowUp      DateTime?
+  proposalLink      String?
+  proposedSolution  String?
+  status            String
+  pipedriveOrgId    String?
+  pipedrivePersonId String?
+  pipedriveDealId   String?
+  followUps         FollowUp[]
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+}
+
+model Draft {
+  id        String   @id @default(cuid())
+  emailId   String
+  email     Email    @relation(fields: [emailId], references: [id])
+  content   String
+  createdAt DateTime @default(now())
+  status    String   // pending, sent, deleted
+  updatedAt DateTime @updatedAt
+}
+
+model Analytics {
+  id            String   @id @default(cuid())
+  type          String   // emails_sent, replies_received, follow_ups_needed
+  value         Int
+  date          DateTime
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model FollowUp {
+  id          String   @id @default(cuid())
+  emailId     String
+  email       Email    @relation(fields: [emailId], references: [id])
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id])
+  content     String
+  status      String   @default("pending")
+  scheduledAt DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum EmailStatus {
+  SENT
+  REPLIED
+  FOLLOW_UP
+}
+
+enum ClientStatus {
+  NEW
+  CONTACTED
+  PROPOSAL_SENT
+  NEGOTIATING
+  CLOSED
+  LOST
+}
+
+enum FollowUpStatus {
+  PENDING
+  SENT
+  CANCELLED
+} 

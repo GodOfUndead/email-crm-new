@@ -1,0 +1,20 @@
+{
+  "buildCommand": "prisma generate && next build",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "regions": ["iad1"],
+  "env": {
+    "DATABASE_URL": "@database_url",
+    "OPENAI_API_KEY": "@openai_api_key",
+    "PIPEDRIVE_API_KEY": "@pipedrive_api_key",
+    "GMAIL_CLIENT_ID": "@gmail_client_id",
+    "GMAIL_CLIENT_SECRET": "@gmail_client_secret",
+    "GMAIL_REFRESH_TOKEN": "@gmail_refresh_token"
+  },
+  "crons": [
+    {
+      "path": "/api/cron/follow-ups",
+      "schedule": "0 9 * * *"
+    }
+  ]
+} 
