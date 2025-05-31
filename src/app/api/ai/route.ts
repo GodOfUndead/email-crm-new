@@ -1,47 +1,40 @@
 import { NextResponse } from "next/server"
-import { Configuration, OpenAIApi } from "openai"
+import OpenAI from "openai"
 
-const configuration = new Configuration({
+const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
-const openai = new OpenAIApi(configuration)
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    const { originalEmail, context } = await request.json()
+    const { prompt } = await req.json()
 
-    const prompt = `Generate a follow-up email based on the following context:
-    Original email: ${originalEmail}
-    Context: ${context}
-    
-    The follow-up should be professional, concise, and maintain the conversation flow.`
-
-    const completion = await openai.createChatCompletion({
-      model: "gpt-3.5-turbo",
+    const completion = await openai.chat.completions.create({
       messages: [
         {
           role: "system",
-          content: "You are a professional email assistant that helps write follow-up emails.",
+          content: "You are a helpful AI assistant.",
         },
         {
           role: "user",
           content: prompt,
         },
       ],
-      max_tokens: 500,
+      model: "gpt-4-turbo-preview",
       temperature: 0.7,
     })
 
-    const followUpContent = completion.data.choices[0]?.message?.content
+    const response = completion.choices[0]?.message?.content
 
-    if (!followUpContent) {
-      throw new Error("Failed to generate follow-up content")
+    if (!response) {
+      throw new Error("Failed to generate response")
     }
 
-    return NextResponse.json({ content: followUpContent })
+    return NextResponse.json({ response })
   } catch (error) {
+    console.error("Error generating AI response:", error)
     return NextResponse.json(
-      { error: "Failed to generate follow-up content" },
+      { error: "Failed to generate response" },
       { status: 500 }
     )
   }
