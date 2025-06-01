@@ -5,12 +5,18 @@ import { EmailStatus } from "@prisma/client"
 const analyticsTypes = ["emails", "follow-ups", "replies"] as const
 type AnalyticsType = typeof analyticsTypes[number]
 
+type RouteContext = {
+  params: {
+    type: string
+  }
+}
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { type: string } }
+  context: RouteContext
 ) {
   try {
-    const type = params.type as AnalyticsType
+    const type = context.params.type as AnalyticsType
 
     if (!analyticsTypes.includes(type)) {
       return NextResponse.json(
