@@ -7,10 +7,10 @@ type AnalyticsType = typeof analyticsTypes[number]
 
 export async function GET(
   request: NextRequest,
-  context: { params: { type: string } }
+  { params }: { params: { type: string } }
 ) {
   try {
-    const type = context.params.type as AnalyticsType
+    const type = params.type as AnalyticsType
 
     if (!analyticsTypes.includes(type)) {
       return NextResponse.json(
