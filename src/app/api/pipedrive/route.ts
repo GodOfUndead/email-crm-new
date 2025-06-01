@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server"
-import { PrismaClient } from "@prisma/client"
-import { createPipedriveClient, updatePipedriveClient, findOrCreateOrganization, findOrCreatePerson, createDeal } from "@/lib/pipedrive"
+import { Prisma } from "@prisma/client"
+import { prisma } from "@/lib/prisma"
+import { createPipedriveClient, updatePipedriveClient, createPipedriveDeal, updatePipedriveDeal } from "@/lib/pipedrive"
 import { z } from "zod"
-
-const prisma = new PrismaClient()
 
 const createClientSchema = z.object({
   name: z.string(),
@@ -31,15 +30,24 @@ const updateDealSchema = z.object({
   stageId: z.number().optional(),
 })
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url)
+    const type = searchParams.get("type")
+
+    if (type === "deals") {
+      // Handle deals GET request
+      return NextResponse.json({ message: "Deals endpoint" })
+    }
+
+    // Default to clients
     const clients = await prisma.client.findMany({
       orderBy: { lastContactDate: "desc" },
     })
     return NextResponse.json(clients)
   } catch (error) {
     return NextResponse.json(
-      { error: "Failed to fetch clients" },
+      { error: "Failed to fetch data" },
       { status: 500 }
     )
   }
@@ -47,29 +55,43 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const { searchParams } = new URL(req.url)
+    const type = searchParams.get("type")
     const body = await req.json()
-    const { name, email, company } = createClientSchema.parse(body)
 
-    // Create client in Pipedrive
+    if (type === "deals") {
+      const { title, personId, orgId, value, stageId } = createDealSchema.parse(body)
+      const deal = await createPipedriveDeal({
+        title,
+        personId,
+        orgId,
+        value,
+        stageId,
+      })
+      return NextResponse.json(deal)
+    }
+
+    // Default to client creation
+    const { name, email, company } = createClientSchema.parse(body)
     const { personId, orgId } = await createPipedriveClient({
       name,
       email,
       company,
     })
 
-    // Create client in our database
     const client = await prisma.client.create({
       data: {
-        name,
+        leadName: name,
         email,
-        company,
+        companyName: company || "",
         pipedriveId: personId.toString(),
+        lastContactDate: new Date(),
       },
     })
 
     return NextResponse.json(client)
   } catch (error) {
-    console.error("Error creating client:", error)
+    console.error("Error creating resource:", error)
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid request data" },
@@ -77,7 +99,7 @@ export async function POST(req: Request) {
       )
     }
     return NextResponse.json(
-      { error: "Failed to create client" },
+      { error: "Failed to create resource" },
       { status: 500 }
     )
   }
@@ -87,18 +109,29 @@ export async function PATCH(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
     const id = searchParams.get("id")
+    const type = searchParams.get("type")
 
     if (!id) {
       return NextResponse.json(
-        { error: "Client ID is required" },
+        { error: "ID is required" },
         { status: 400 }
       )
     }
 
     const body = await req.json()
-    const { name, email, company } = updateClientSchema.parse(body)
 
-    // Get client from our database
+    if (type === "deals") {
+      const { title, value, stageId } = updateDealSchema.parse(body)
+      const deal = await updatePipedriveDeal(parseInt(id), {
+        title,
+        value,
+        stageId,
+      })
+      return NextResponse.json(deal)
+    }
+
+    // Default to client update
+    const { name, email, company } = updateClientSchema.parse(body)
     const client = await prisma.client.findUnique({
       where: { id },
     })
@@ -110,7 +143,6 @@ export async function PATCH(req: Request) {
       )
     }
 
-    // Update client in Pipedrive
     if (client.pipedriveId) {
       await updatePipedriveClient(parseInt(client.pipedriveId), {
         name,
@@ -119,19 +151,19 @@ export async function PATCH(req: Request) {
       })
     }
 
-    // Update client in our database
     const updatedClient = await prisma.client.update({
       where: { id },
       data: {
-        name,
+        leadName: name,
         email,
-        company,
+        companyName: company || "",
+        lastContactDate: new Date(),
       },
     })
 
     return NextResponse.json(updatedClient)
   } catch (error) {
-    console.error("Error updating client:", error)
+    console.error("Error updating resource:", error)
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid request data" },
@@ -139,76 +171,7 @@ export async function PATCH(req: Request) {
       )
     }
     return NextResponse.json(
-      { error: "Failed to update client" },
-      { status: 500 }
-    )
-  }
-}
-
-export async function PUT(req: Request) {
-  try {
-    const body = await req.json()
-    const { title, personId, orgId, value, stageId } =
-      createDealSchema.parse(body)
-
-    // Create deal in Pipedrive
-    const deal = await createPipedriveDeal({
-      title,
-      personId,
-      orgId,
-      value,
-      stageId,
-    })
-
-    return NextResponse.json(deal)
-  } catch (error) {
-    console.error("Error creating deal:", error)
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: "Invalid request data" },
-        { status: 400 }
-      )
-    }
-    return NextResponse.json(
-      { error: "Failed to create deal" },
-      { status: 500 }
-    )
-  }
-}
-
-export async function PATCH_DEAL(req: Request) {
-  try {
-    const { searchParams } = new URL(req.url)
-    const id = searchParams.get("id")
-
-    if (!id) {
-      return NextResponse.json(
-        { error: "Deal ID is required" },
-        { status: 400 }
-      )
-    }
-
-    const body = await req.json()
-    const { title, value, stageId } = updateDealSchema.parse(body)
-
-    // Update deal in Pipedrive
-    const deal = await updatePipedriveDeal(parseInt(id), {
-      title,
-      value,
-      stageId,
-    })
-
-    return NextResponse.json(deal)
-  } catch (error) {
-    console.error("Error updating deal:", error)
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: "Invalid request data" },
-        { status: 400 }
-      )
-    }
-    return NextResponse.json(
-      { error: "Failed to update deal" },
+      { error: "Failed to update resource" },
       { status: 500 }
     )
   }

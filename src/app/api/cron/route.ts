@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server"
-import { PrismaClient } from "@prisma/client"
+import { prisma } from "@/lib/prisma"
 import { processQueue } from "@/lib/queue"
-
-const prisma = new PrismaClient()
+import { ClientStatus } from "@prisma/client"
 
 export async function GET(request: Request) {
   try {
@@ -27,10 +26,10 @@ export async function GET(request: Request) {
         nextFollowUp: {
           lte: today,
         },
-        status: "active",
+        status: ClientStatus.CONTACTED,
       },
       data: {
-        status: "follow_up_needed",
+        status: ClientStatus.NEW,
       },
     })
 

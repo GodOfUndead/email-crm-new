@@ -1,5 +1,5 @@
 import { prisma } from './prisma';
-import { EmailStatus } from '@prisma/client';
+import { EmailStatus, FollowUpStatus } from '@prisma/client';
 
 export class SearchService {
   async searchEmails(query: string) {
@@ -91,7 +91,7 @@ export class SearchService {
       const [emailsSent, repliesReceived, followUpsNeeded] = await Promise.all([
         prisma.email.count({
           where: {
-            status: 'SENT',
+            status: EmailStatus.SENT,
             sentAt: {
               gte: startOfDay,
             },
@@ -99,7 +99,7 @@ export class SearchService {
         }),
         prisma.email.count({
           where: {
-            status: 'REPLIED',
+            status: EmailStatus.REPLIED,
             sentAt: {
               gte: startOfDay,
             },
@@ -107,7 +107,7 @@ export class SearchService {
         }),
         prisma.followUp.count({
           where: {
-            status: 'PENDING',
+            status: FollowUpStatus.PENDING,
           },
         }),
       ]);
