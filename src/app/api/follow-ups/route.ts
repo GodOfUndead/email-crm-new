@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { sendEmail } from "@/lib/gmail"
 import { addToQueue } from "@/lib/redis"
 import { z } from "zod"
+import { FollowUpStatus } from "@prisma/client"
 
 const createFollowUpSchema = z.object({
   emailId: z.string(),
@@ -18,7 +19,7 @@ export async function GET(req: Request) {
     const status = searchParams.get("status")
 
     const followUps = await prisma.followUp.findMany({
-      where: status ? { status: status as any } : undefined,
+      where: status ? { status: status as FollowUpStatus } : undefined,
       include: {
         email: true,
         client: true,
@@ -45,14 +46,16 @@ export async function POST(req: Request) {
     const { emailId, clientId, content, scheduledFor } =
       createFollowUpSchema.parse(body)
 
+    const followUpData = {
+      emailId,
+      clientId,
+      content: content ?? null,
+      status: "PENDING" as const,
+      scheduledAt: scheduledFor,
+    }
+
     const followUp = await prisma.followUp.create({
-      data: {
-        emailId,
-        clientId,
-        content: content!,
-        status: "PENDING",
-        scheduledFor,
-      },
+      data: followUpData,
       include: {
         email: true,
         client: true,
